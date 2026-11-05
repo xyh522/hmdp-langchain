@@ -12,6 +12,13 @@
 /frontend/frontend-vue3/node_modules/
 /frontend/frontend-vue3/dist/
 
+#backend 构建与依赖
+/backend/.idea/
+/backend/target/
+/backend/src/main/resources/hmdp-loadtest/lib/
+/backend/src/main/resources/hmdp-loadtest/output/
+/.git-backups/
+
 # Nginx 运行产物与已部署网页
 /frontend/logs/
 /frontend/temp/
