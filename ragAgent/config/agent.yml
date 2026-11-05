@@ -1,0 +1,3 @@
+external_data_path: data/external/records.csv
+shortmemory_path: database/checkpoints.db
+compact_model: qwen-max

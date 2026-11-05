@@ -1,0 +1,21 @@
+# Agent 运行数据与 Python 环境
+/ragAgent/venv/
+/ragAgent/database/
+/ragAgent/logs/
+/ragAgent/chroma_db/
+/ragAgent/**/__pycache__/
+/ragAgent/**/*.py[cod]
+/ragAgent/.env
+/ragAgent/.env.*
+
+# Vue 构建与依赖
+/frontend/frontend-vue3/node_modules/
+/frontend/frontend-vue3/dist/
+
+# Nginx 运行产物与已部署网页
+/frontend/logs/
+/frontend/temp/
+
+# 本地配置备份
+*.bak
+*.bak.*

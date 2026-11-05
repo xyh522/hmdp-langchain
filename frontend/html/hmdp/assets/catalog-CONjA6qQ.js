@@ -1,0 +1,1 @@
+import{k as t}from"./index-CodjHTjt.js";const r=()=>t.get("/shop-type/list"),c=(s,o=1)=>t.get("/shop/of/type",{params:{typeId:s,current:o,x:120.149993,y:30.334229}}),p=s=>t.get(`/shop/${s}`),a=s=>t.get(`/voucher/list/${s}`),h=s=>t.post(`/voucher-order/seckill/${s}`),l=()=>t.get("/voucher-order/list",{params:{current:1}});export{c as a,h as b,a as c,l as d,p as g,r as l};

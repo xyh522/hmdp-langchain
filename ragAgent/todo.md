@@ -1,0 +1,10 @@
+tavily预定义的网页搜索tool
+
+使用pydantic 批量注释工具更优雅封装了一层，然后create_agent(response_format)来告诉大模型，工具的输入，输出应该怎么样来节省token，本质也是系统提示词。
+
+长短期记忆用langgraph.checkpoint，在create_agent中设置checkpoint
+
+上下文限制128KB，1是修剪，移出一部分,2删除：完整删除快照，3总结摘要也就是压缩
+压缩需要一个新的摘要模型一个中间件，SummarizationMiddleware
+
+oss服务节省token

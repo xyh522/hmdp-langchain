@@ -1,0 +1,1 @@
+import{k as o}from"./index-DEj0YxYu.js";const s=()=>o.get("/blog/hot",{params:{current:1}}),l=t=>o.get(`/blog/${t}`),e=()=>o.get("/blog/of/me"),a=t=>o.put(`/blog/like/${t}`);export{l as g,s as h,a as l,e as m};
