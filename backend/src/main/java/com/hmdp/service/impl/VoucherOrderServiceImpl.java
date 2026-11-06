@@ -30,9 +30,8 @@ import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.time.Duration;
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.*;
+import com.hmdp.entity.Voucher;
+import com.hmdp.mapper.VoucherMapper;
 @Service
 @Slf4j
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
@@ -54,6 +53,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Lazy
     private IVoucherOrderService voucherOrderService;
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
+    @Resource
+    private VoucherMapper voucherMapper;
 
     //加载lua脚本
     static {
@@ -155,5 +156,46 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         this.save(voucherOrder);
 
+    }
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result buyOrdinaryVoucher(Long voucherId) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
+            return Result.fail("用户未登录");
+        }
+
+        if (voucherId == null || voucherId <= 0) {
+            return Result.fail("优惠券ID不合法");
+        }
+
+        // 根据数据库判断券类型和上架状态。
+        Voucher voucher = voucherMapper.selectById(voucherId);
+
+        if (voucher == null) {
+            return Result.fail("优惠券不存在");
+        }
+
+        if (!Integer.valueOf(0).equals(voucher.getType())) {
+            return Result.fail("该优惠券不是普通券");
+        }
+
+        if (!Integer.valueOf(1).equals(voucher.getStatus())) {
+            return Result.fail("优惠券已下架");
+        }
+
+        long orderId = redisIdWorker.nextId("order");
+
+        VoucherOrder order = new VoucherOrder();
+        order.setId(orderId);
+        order.setUserId(user.getId());
+        order.setVoucherId(voucherId);
+        order.setStatus(1); // 待支付，不代表付款成功。
+
+        if (!save(order)) {
+            throw new IllegalStateException("创建普通券订单失败");
+        }
+
+        return Result.ok(String.valueOf(orderId));
     }
 }

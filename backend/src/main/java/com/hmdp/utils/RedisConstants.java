@@ -20,4 +20,10 @@ public class RedisConstants {
     public static final String SHOP_GEO_KEY = "geoshop:geo:";
     public static final String USER_SIGN_KEY = "sign:";
     public static final String CACHE_SHOP_TYPE_KEY = "cache:shop-type:";
+    // 每张秒杀券的完整信息 JSON，按券自身截止时间过期。
+    public static final String SECKILL_VOUCHER_KEY = "seckill:voucher:";
+    // 商店 -> 秒杀券 ID 数组 JSON，按最晚截止时间过期；空列表短暂缓存。
+    public static final String SECKILL_VOUCHER_LIST_KEY = "seckill:voucher:list:";
+    // 同一店铺的 Redis 列表重建与失效共用此锁。
+    public static final String LOCK_SECKILL_VOUCHER_LIST_KEY = "lock:seckill:voucher:list:";
 }

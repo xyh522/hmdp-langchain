@@ -121,6 +121,12 @@
             <version>13.0</version>
             <scope>compile</scope>
         </dependency>
+        <!-- JVM 本地缓存：兼容 Java 8 -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>2.9.3</version>
+        </dependency>
     </dependencies>
 
     <build>

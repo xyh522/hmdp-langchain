@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import com.hmdp.dto.Result;
+import com.hmdp.cache.SeckillVoucherListLocalCache;
 import com.hmdp.entity.Shop;
 import com.hmdp.entity.Voucher;
 import com.hmdp.mapper.VoucherOrderMapper;
@@ -24,6 +25,7 @@ public class AdminManagementService {
     @Resource private ISeckillVoucherService seckillVoucherService;
     @Resource private VoucherOrderMapper orderMapper;
     @Resource private StringRedisTemplate redis;
+    @Resource private SeckillVoucherListLocalCache seckillVoucherListLocalCache;
 
     public Result updateShop(Long id, Shop input) {
         Shop old = id == null || id <= 0 ? null : shopService.getById(id);
@@ -99,6 +101,8 @@ public class AdminManagementService {
         voucherService.removeById(voucherId);
         if (voucher.getType() != null && voucher.getType() == 1) {
             redis.delete(RedisConstants.SECKILL_STOCK_KEY + voucherId);
+            // 数据库提交成功后再清理本机秒杀列表缓存。
+            seckillVoucherListLocalCache.invalidateAfterCommit(shopId, voucherId);
         }
         return Result.ok();
     }

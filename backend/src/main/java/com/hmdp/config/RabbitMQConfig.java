@@ -21,6 +21,7 @@ public class RabbitMQConfig {
     public static final String SECKILL_ORDER_DLX_QUEUE = "seckill.order.dlx.queue";
     public static final String SECKILL_ORDER_DLX_ROUTING_KEY = "seckill.order.dlx";
 
+    public static final String SECKILL_CACHE_EXCHANGE = "seckill.cache.invalidation.exchange";
     /**
      * 消息转换器 - 使用JSON格式
      */
@@ -109,5 +110,28 @@ public class RabbitMQConfig {
                 .to(seckillOrderDlxExchange())
                 .with(SECKILL_ORDER_DLX_ROUTING_KEY);
     }
+
+
+    @Bean
+    public FanoutExchange seckillCacheExchange() {
+        return new FanoutExchange(SECKILL_CACHE_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public AnonymousQueue seckillCacheQueue() {
+        AnonymousQueue queue = new AnonymousQueue();
+
+        // 兼容当前 RabbitMQ：移除旧版 Spring AMQP 默认添加的弃用参数。
+        queue.setMasterLocator(null);
+
+        return queue;
+    }
+
+    @Bean
+    public Binding seckillCacheBinding() {
+        return BindingBuilder.bind(seckillCacheQueue())
+                .to(seckillCacheExchange());
+    }
+
 
 }

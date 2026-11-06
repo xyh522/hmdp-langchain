@@ -5,7 +5,7 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.Voucher;
 import com.hmdp.service.IVoucherService;
 import org.springframework.web.bind.annotation.*;
-
+import com.hmdp.service.ISeckillVoucherService;
 import javax.annotation.Resource;
 
 /**
@@ -21,6 +21,8 @@ public class VoucherController {
 
     @Resource
     private IVoucherService voucherService;
+    @Resource
+    private ISeckillVoucherService seckillVoucherService;
 
     /**
      * 新增秒杀券
@@ -32,7 +34,20 @@ public class VoucherController {
         voucherService.addSeckillVoucher(voucher);
         return Result.ok(voucher.getId());
     }
+    /**
+     * 查询指定店铺的秒杀券列表，不执行抢购。
+     */
+    @GetMapping("/seckill/list/{shopId}")
+    public Result querySeckillVouchersOfShop(
+            @PathVariable("shopId") Long shopId) {
 
+        if (shopId == null || shopId <= 0) {
+            return Result.fail("店铺ID不合法");
+        }
+
+        return Result.ok(
+                seckillVoucherService.querySeckillVouchersOfShop(shopId));
+    }
     /**
      * 新增普通券
      * @param voucher 优惠券信息
@@ -54,4 +69,5 @@ public class VoucherController {
     public Result queryVoucherOfShop(@PathVariable("shopId") Long shopId) {
        return voucherService.queryVoucherOfShop(shopId);
     }
+
 }

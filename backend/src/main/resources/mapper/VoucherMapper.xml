@@ -2,14 +2,31 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.hmdp.mapper.VoucherMapper">
 
+    <!-- 普通券列表：原列表接口只返回上架的普通券。 -->
     <select id="queryVoucherOfShop" resultType="com.hmdp.entity.Voucher" parameterType="java.lang.Long">
         SELECT
-            v.`id`, v.`shop_id`, v.`title`, v.`sub_title`, v.`rules`, v.`pay_value`,
-            v.`actual_value`, v.`type`, sv.`stock` , sv.begin_time , sv.end_time
+            v.id, v.shop_id, v.title, v.sub_title, v.rules,
+            v.pay_value, v.actual_value, v.type, v.status
         FROM tb_voucher v
-        LEFT JOIN  tb_seckill_voucher sv ON v.id = sv.voucher_id
-        WHERE v.shop_id = #{shopId} AND v.status = 1
-          AND (v.type = 0 OR (v.type = 1 AND sv.end_time > NOW()))
+        WHERE v.shop_id = #{shopId}
+          AND v.status = 1
+          AND v.type = 0
+        ORDER BY v.id DESC
+    </select>
+
+    <!-- 秒杀券列表：独立查询活动信息，不查询实时库存。 -->
+    <select id="querySeckillVouchersOfShop" resultType="com.hmdp.entity.Voucher" parameterType="java.lang.Long">
+        SELECT
+            v.id, v.shop_id, v.title, v.sub_title, v.rules,
+            v.pay_value, v.actual_value, v.type, v.status,
+            sv.begin_time, sv.end_time, v.create_time, v.update_time
+        FROM tb_voucher v
+        INNER JOIN tb_seckill_voucher sv ON v.id = sv.voucher_id
+        WHERE v.shop_id = #{shopId}
+          AND v.status = 1
+          AND v.type = 1
+          AND sv.end_time > NOW()
+        ORDER BY sv.begin_time ASC, v.id DESC
     </select>
     <select id="queryAdminVouchers" resultType="com.hmdp.entity.Voucher">
         SELECT v.id, v.shop_id, v.title, v.sub_title, v.rules, v.pay_value,

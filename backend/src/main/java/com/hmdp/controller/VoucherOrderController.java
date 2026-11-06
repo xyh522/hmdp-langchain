@@ -52,4 +52,11 @@ public class VoucherOrderController {
     public Result seckillVoucher(@PathVariable("id") Long voucherId) {
         return voucherOrderService.seckillVoucher(voucherId);
     }
+    /**
+     * 普通券下单，与秒杀流程分离。
+     */
+    @PostMapping("/ordinary/{id}")
+    public Result buyOrdinaryVoucher(@PathVariable("id") Long voucherId) {
+        return voucherOrderService.buyOrdinaryVoucher(voucherId);
+    }
 }

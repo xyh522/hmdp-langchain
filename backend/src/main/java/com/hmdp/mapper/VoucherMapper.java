@@ -17,5 +17,6 @@ import java.util.List;
 public interface VoucherMapper extends BaseMapper<Voucher> {
 
     List<Voucher> queryVoucherOfShop(@Param("shopId") Long shopId);
+    List<Voucher> querySeckillVouchersOfShop(@Param("shopId") Long shopId);
     List<Voucher> queryAdminVouchers(@Param("shopId") Long shopId);
 }

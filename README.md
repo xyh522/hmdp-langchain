@@ -39,7 +39,7 @@
 | --- | --- | --- |
 | 浏览器端 | Vue 3、Vue Router、Axios、Vite | 店铺浏览与搜索、博客、登录、客服、秒杀券订单、管理员店铺及优惠券页面 |
 | 静态服务与代理 | Nginx for Windows | 提供 Vue 构建文件，将 `/api/` 转发至 Java；客服 SSE 关闭代理缓冲 |
-| Java 后端 | Spring Boot 2.3.12、MyBatis-Plus、MySQL、Redis/Redisson、RabbitMQ | 业务接口、用户会话与角色检查、店铺及优惠券管理、秒杀资格判断和异步订单入库 |
+| Java 后端 | Spring Boot 2.3.12、MyBatis-Plus、MySQL、Redis/Redisson、Caffeine 2.9.3、RabbitMQ | 业务接口、用户会话与角色检查、店铺及优惠券管理、秒杀资格判断和异步订单入库 |
 | Agent 服务 | Python 3.12、FastAPI、LangChain/LangGraph、DashScope、Chroma、SQLite | 演唱会知识检索、模型调用、按 thread_id 隔离的对话记忆、SSE 回复 |
 
 后端 `pom.xml` 的 `java.version` 为 **1.8**，这是源码/目标级别；实际运行 JDK 还需与项目依赖兼容。Agent 在 `config/rag.yml` 中使用 `qwen-max` 聊天模型和 `text-embedding-v4` 向量模型，调用模型需要有效的 DashScope 密钥。
@@ -57,6 +57,58 @@
 ```
 
 浏览器不直接传入可决定订单归属的用户 ID；Java 根据当前登录用户读取其订单。客服由 Java 传 `message`、`user_id`、`thread_id` 给 Agent；Agent 的短期记忆按 `thread_id` 隔离。秒杀请求先完成 Redis 资格判断，再经 RabbitMQ 异步写入 MySQL，因此接口返回与订单可查询之间可能有短暂延迟。
+
+**本次更新：秒杀券列表三级缓存（Caffeine）**
+
+秒杀券展示与抢购流程分离：店铺页面分别请求普通券列表和秒杀券列表；Caffeine 只缓存店铺下的完整秒杀券信息列表，不缓存实时库存，不参与库存扣减和订单创建。
+
+| 接口（Java 路径） | 用途 |
+| --- | --- |
+| `GET /voucher/list/{shopId}` | 普通券列表，查询上架的普通券，不经过本次新增的 Caffeine |
+| `GET /voucher/seckill/list/{shopId}` | 秒杀券列表，按 Caffeine → Redis → MySQL 加载 |
+| `POST /voucher-order/ordinary/{id}` | 普通券购买入口 |
+| `POST /voucher-order/seckill/{id}` | 现有秒杀抢购入口，Redis Lua 资格校验与扣库存、RabbitMQ 异步落库 |
+
+浏览器通过 Nginx 调用时，以上路径带 `/api` 前缀。券卡片展示标题、描述、使用规则、金额及秒杀开始/结束时间；列表 DTO 不包含实时库存。秒杀列表查询上架且尚未结束的活动，也包含尚未开始的活动。
+
+```text
+查询店铺秒杀券列表
+  ├─ Caffeine：shopId → List<SeckillVoucherDTO>
+  ├─ 未命中 → Redis 店铺索引 → 批量读取每张券的完整 JSON
+  └─ 索引或详情不可用 → MySQL 联表查询
+                         → 回填 Redis 券详情、店铺索引
+                         → 回填当前 JVM 的 Caffeine
+```
+
+| 缓存或锁 | 内容 | 有效期／用途 |
+| --- | --- | --- |
+| Caffeine：`shopId` | 完整秒杀券 DTO 列表，最多 1,000 个店铺条目 | 到列表中最早一张券的结束时间；空列表 60 秒 |
+| Redis：`seckill:voucher:list:{shopId}` | JSON 券 ID 数组，例如 `[19,20]` | 到列表中最晚一张券的结束时间；空数组 `[]` 保留 60 秒 |
+| Redis：`seckill:voucher:{voucherId}` | 单张券完整 DTO JSON，包含描述、规则、金额、开始和结束时间等 | 各自到该券的结束时间 |
+| Redisson：`lock:seckill:voucher:list:{shopId}` | 店铺粒度的分布式锁 | 协调列表加载、重建与缓存失效 |
+| Redis：`seckill:stock:{voucherId}` | 抢购使用的实时库存 | 由原抢购流程管理，不属于本次展示缓存清理范围 |
+
+表中的花括号表示变量占位，实际键如 `seckill:voucher:list:1`、`seckill:voucher:19`，不含花括号。每张券独立设置 TTL，因此不同活动可在不同时间到期。索引缺失、任一详情缺失/过期或格式不符合当前 DTO 时，一次联表查询重建该店铺列表，而不是逐张查数据库。当前不再使用单券本地缓存、独立单券查询接口或 `seckill:voucher:null:` 空值键。
+
+主要代码位置：
+
+| 文件（相对项目根目录） | 职责 |
+| --- | --- |
+| `backend/src/main/java/com/hmdp/cache/SeckillVoucherListLocalCache.java` | Caffeine 容量与动态过期、事务提交后失效、Redis 清理及广播发送方法 |
+| `backend/src/main/java/com/hmdp/service/impl/SeckillVoucherServiceImpl.java` | Redis 索引与详情读取、数据库回源、逐券 TTL 回填及返回 DTO 副本 |
+| `backend/src/main/java/com/hmdp/dto/SeckillVoucherDTO.java` | 展示用完整券信息，不包含实时库存 |
+| `backend/src/main/java/com/hmdp/utils/RedisConstants.java` | 列表索引、券详情、重建锁的键前缀 |
+| `backend/src/main/resources/mapper/VoucherMapper.xml` | 普通券与秒杀券的独立查询；通过 `tb_voucher.id = tb_seckill_voucher.voucher_id` 联表 |
+| `backend/src/main/java/com/hmdp/config/RabbitMQConfig.java` | 缓存广播交换机、每 JVM 独立匿名队列及绑定 |
+| `backend/src/main/java/com/hmdp/listener/SeckillVoucherCacheListener.java` | 接收券 ID 消息体和店铺 ID 消息头，执行缓存失效，不再次广播 |
+| `frontend/frontend-vue3/src/components/VoucherCard.vue` | 普通券、秒杀券卡片展示和购买按钮 |
+| `frontend/frontend-vue3/src/components/pages/ShopDetailPage.vue` | 分别加载普通券、秒杀券列表，调用各自购买入口 |
+
+写入端已有的新增、删除秒杀券路径调用 `invalidateAfterCommit(shopId, voucherId)`：数据库提交后删除 Redis 店铺索引、受影响的券详情及当前 JVM 列表；回滚时不执行提交回调。后续修改接口也需要显式调用此入口，直接修改数据库不会自动触发缓存清理。独立的 `SeckillVoucherListCacheInvalidator` 已合并到列表缓存类。
+
+**广播当前接入状态：** 已声明 `seckill.cache.invalidation.exchange` Fanout 交换机，并实现每 JVM 独立匿名队列、消费者和 `publishInvalidation()` 发送方法。但当前 `invalidateAfterCommit()` 仍直接调用 `invalidateNow()`，没有调用发送方法，因此新增/删除尚不会自动广播。跨 JVM 失效链路仍需接通，不能仅凭存在消费者就认定广播已生效。匿名队列使用 `setMasterLocator(null)` 移除旧版 Spring AMQP 默认的弃用参数，以避免 RabbitMQ 拒绝 `x-queue-master-locator` 队列声明。
+
+本次缓存改动不包含库存为零触发广播、售罄自动隐藏、死信回流票、可靠消息补偿或支付流程。展示缓存的清理不能代替库存校验。当前订单消费者仍存在异常被内层捕获、自定义重试计数未递增等问题；死信处理仅记录日志并确认消息，未实现 Redis 库存归还。上述内容是待完善项，不应当作已有一致性保障。
 
 **本地端口与启动顺序（Windows）**
 
@@ -79,7 +131,7 @@ SOURCE D:/java_heima_learning/hmdp+langchain/db/生成.sql;
 
 `db/生成.sql` 包含当前业务用到的 `tb_*` 和 `cs_*` 共 13 张表，只含结构，不含用户、店铺、订单或聊天数据。它用于**空库初始化**；已有业务表时不要重复执行。空库导入后也不会凭空出现店铺、管理员账号或知识内容，需要另行录入。`backend/src/main/resources/db/hmdp.sql` 是旧版样例脚本，包含 `DROP TABLE`；同目录的 `customer_thread_migration.sql`、`customer_login_session.sql`、`user_role.sql` 用于旧库迁移，全新空库导入 `db/生成.sql` 后不要再执行这些脚本。
 
-MySQL 库和表**不会**由 IDEA、MyBatis 或 Java 服务自动创建。Redis 与 RabbitMQ 服务、RabbitMQ 用户及 virtual-host 也需事先准备；Java 的 `RabbitMQConfig` 会声明秒杀订单所用交换机与队列。连接地址在 `backend/src/main/resources/application.yaml`，换机器后应按实际环境修改。
+MySQL 库和表**不会**由 IDEA、MyBatis 或 Java 服务自动创建。Redis 与 RabbitMQ 服务、RabbitMQ 用户及 virtual-host 也需事先准备；Java 的 `RabbitMQConfig` 会声明秒杀订单、死信交换机与队列，以及缓存失效广播交换机和每实例独立的临时队列。连接地址在 `backend/src/main/resources/application.yaml`，换机器后应按实际环境修改。
 
 **2. 创建 Agent 虚拟环境并启动**
 

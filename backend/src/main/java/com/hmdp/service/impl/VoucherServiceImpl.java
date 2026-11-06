@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import com.hmdp.cache.SeckillVoucherListLocalCache;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
@@ -14,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.List;
 
-import static com.hmdp.utils.RedisConstants.SECKILL_STOCK_KEY;
+import static com.hmdp.utils.RedisConstants.*;
 
 /**
  * <p>
@@ -31,6 +32,8 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
     private ISeckillVoucherService seckillVoucherService;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private SeckillVoucherListLocalCache seckillVoucherListLocalCache;
 
     @Override
     public Result queryVoucherOfShop(Long shopId) {
@@ -54,5 +57,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucherService.save(seckillVoucher);
         // 保存秒杀库存到Redis中
         stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
+        // 提交后失效店铺索引和新券信息，下一次列表查询从数据库完整重建。
+        seckillVoucherListLocalCache.invalidateAfterCommit(voucher.getShopId(), voucher.getId());
     }
 }
