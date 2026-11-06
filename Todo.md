@@ -1,1 +1,1 @@
-有一个事件触发清理caffeine和redis过程，但是还没想好用什么事件来触发，所以默认caffeine是超时释放。
+有一个事件触发清理caffeine和redis函数，但是还没想好用什么事件来触发，所以默认caffeine是超时。

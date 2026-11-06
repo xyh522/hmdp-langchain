@@ -6,30 +6,134 @@
 
 ```text
 项目根目录/
-├─ backend/                 Spring Boot 业务后端
-│  ├─ pom.xml               Maven 依赖及 Java 源码级别
-│  └─ src/main/
-│     ├─ java/com/hmdp/     controller、service、mapper、config 等
-│     └─ resources/         application.yaml、SQL 迁移、Mapper XML、Lua 脚本
-├─ frontend/                Windows Nginx 与 Vue 3 项目
+├─ README.md                              项目说明、架构与启动方式
+├─ backend/                               Spring Boot 业务后端
+│  ├─ pom.xml                             Maven 依赖，包含 Caffeine 2.9.3
+│  └─ src/
+│     ├─ main/
+│     │  ├─ java/com/hmdp/
+│     │  │  ├─ HmDianPingApplication.java  后端启动入口
+│     │  │  ├─ cache/
+│     │  │  │  └─ SeckillVoucherListLocalCache.java  列表本地缓存、失效和广播发送方法
+│     │  │  ├─ config/
+│     │  │  │  ├─ RabbitMQConfig.java      订单、死信与缓存广播的交换机和队列
+│     │  │  │  ├─ RedissonConfig.java      Redis 分布式锁客户端
+│     │  │  │  ├─ MvcConfig.java           登录与管理权限拦截器配置
+│     │  │  │  ├─ MybatisConfig.java       MyBatis-Plus 配置
+│     │  │  │  └─ WebExceptionAdvice.java  接口异常处理
+│     │  │  ├─ controller/
+│     │  │  │  ├─ VoucherController.java       普通券、秒杀券列表与新增入口
+│     │  │  │  ├─ VoucherOrderController.java  购买、抢购及订单查询
+│     │  │  │  ├─ AdminController.java         管理端接口
+│     │  │  │  ├─ CustomerController.java      客服聊天与 Agent 转发入口
+│     │  │  │  ├─ UserController.java          用户与登录接口
+│     │  │  │  ├─ ShopController.java          店铺接口
+│     │  │  │  ├─ BlogController.java          博客接口
+│     │  │  │  └─ …                           店铺分类、关注、评论、上传接口
+│     │  │  ├─ dto/
+│     │  │  │  ├─ SeckillVoucherDTO.java   完整秒杀券展示信息，不含实时库存
+│     │  │  │  ├─ VoucherOrderView.java    订单展示对象
+│     │  │  │  ├─ UserDTO.java             登录用户信息
+│     │  │  │  └─ …                       登录参数、统一结果与滚动分页结果
+│     │  │  ├─ entity/
+│     │  │  │  ├─ Voucher.java             优惠券基础信息
+│     │  │  │  ├─ SeckillVoucher.java      秒杀时间与数据库库存
+│     │  │  │  ├─ VoucherOrder.java        优惠券订单
+│     │  │  │  └─ …                       用户、店铺、博客及客服实体
+│     │  │  ├─ listener/
+│     │  │  │  ├─ SeckillOrderListener.java         订单消费、确认与死信处理
+│     │  │  │  └─ SeckillVoucherCacheListener.java  接收跨 JVM 缓存失效通知
+│     │  │  ├─ mapper/
+│     │  │  │  ├─ VoucherMapper.java       普通券、秒杀券及管理列表查询
+│     │  │  │  ├─ VoucherOrderMapper.java  订单数据访问
+│     │  │  │  └─ …                       其他业务表的数据访问
+│     │  │  ├─ service/
+│     │  │  │  ├─ ISeckillVoucherService.java  秒杀券列表服务接口
+│     │  │  │  ├─ MessageProducerService.java  订单消息生产接口
+│     │  │  │  ├─ …                          其他业务服务接口
+│     │  │  │  └─ impl/
+│     │  │  │     ├─ SeckillVoucherServiceImpl.java  三级缓存查询与回填
+│     │  │  │     ├─ VoucherServiceImpl.java         券查询、新增及提交后失效调用
+│     │  │  │     ├─ VoucherOrderServiceImpl.java    Lua 抢购、普通券购买与订单落库
+│     │  │  │     ├─ MessageProducerServiceImpl.java RabbitMQ 订单消息生产者
+│     │  │  │     ├─ AdminManagementService.java     管理端店铺与优惠券业务
+│     │  │  │     └─ …                              用户、店铺、博客及客服业务
+│     │  │  └─ utils/
+│     │  │     ├─ RedisConstants.java      Redis 缓存、库存及锁的键前缀
+│     │  │     ├─ RedisIdWorker.java       订单 ID 生成
+│     │  │     ├─ CacheClient.java         通用 Redis 缓存工具
+│     │  │     ├─ UserHolder.java          当前线程登录用户
+│     │  │     └─ …                       拦截器、锁、密码与校验工具
+│     │  └─ resources/
+│     │     ├─ application.example.yaml   本地配置模板
+│     │     ├─ application.yaml           本机连接配置，不应公开提交
+│     │     ├─ seckill.lua                Redis 库存与重复购买校验、预扣库存
+│     │     ├─ unlock.lua                 Redis 锁释放脚本
+│     │     ├─ mapper/
+│     │     │  ├─ VoucherMapper.xml        普通券与秒杀券列表 SQL
+│     │     │  └─ VoucherOrderMapper.xml   订单查询 SQL
+│     │     ├─ db/                        旧版样例 SQL 与客服、角色迁移脚本
+│     │     └─ hmdp-loadtest/              压测辅助资源
+│     └─ test/java/com/hmdp/
+│        ├─ cache/
+│        │  └─ SeckillVoucherListCacheTest.java  列表缓存相关测试
+│        └─ …                               其他后端测试
+├─ frontend/                               Windows Nginx 与 Vue 3 项目
 │  ├─ frontend-vue3/
-│  │  ├─ src/api/            浏览器调用 Java 接口的封装
-│  │  ├─ src/components/     用户端、管理端及客服界面
-│  │  ├─ src/router/         Vue 路由
-│  │  ├─ public/             构建时复制的静态资源
-│  │  └─ dist/               npm run build 的产物，不提交到 Git
-│  ├─ conf/nginx.conf       监听端口、静态目录及 /api 反向代理
-│  └─ html/hmdp/            Nginx 实际读取的前端文件
-├─ ragAgent/                FastAPI、LangChain Agent 与 RAG
-│  ├─ backend/main.py       /api/chat、/api/health、知识上传等入口
-│  ├─ agent/                Agent、工具和短期记忆
-│  ├─ rag/                  检索与向量库逻辑
-│  ├─ model/、config/、prompts/  模型、配置及提示词
-│  ├─ data/                 原始知识文件
-│  ├─ database/             SQLite 会话与 checkpoint，运行时创建
-│  └─ chroma_db/            Chroma 向量数据，运行时创建
-└─ db/生成.sql              当前 Java 业务所需的 MySQL 空库建表脚本
+│  │  ├─ package.json                      前端依赖与构建命令
+│  │  ├─ vite.config.js                    开发服务与构建配置
+│  │  ├─ src/
+│  │  │  ├─ main.js、App.vue               Vue 应用入口
+│  │  │  ├─ api/
+│  │  │  │  ├─ http.js                     HTTP 客户端封装
+│  │  │  │  ├─ catalog.js                  店铺、优惠券与购买接口
+│  │  │  │  └─ auth.js、admin.js、blog.js、customer.js
+│  │  │  ├─ components/
+│  │  │  │  ├─ VoucherCard.vue             普通券、秒杀券卡片与购买按钮
+│  │  │  │  ├─ CustomerChat.vue            客服聊天界面
+│  │  │  │  ├─ SiteLayout.vue              页面公共布局
+│  │  │  │  └─ pages/
+│  │  │  │     ├─ ShopDetailPage.vue       店铺详情、普通券和秒杀券独立列表
+│  │  │  │     ├─ OrdersPage.vue           优惠券订单列表
+│  │  │  │     ├─ AdminPage.vue            管理端页面
+│  │  │  │     ├─ HomePage.vue、ShopsPage.vue、SearchPage.vue
+│  │  │  │     └─ …                       登录、个人中心及博客详情页面
+│  │  │  ├─ router/index.js                Vue 路由
+│  │  │  ├─ assets/                        公共页面与聊天样式
+│  │  │  └─ utils/                         图片与客服会话辅助工具
+│  │  ├─ public/                          构建时复制的静态资源
+│  │  └─ dist/                            构建产物，不提交到 Git
+│  ├─ conf/nginx.conf                     端口、静态目录及 /api 反向代理
+│  └─ html/hmdp/                          Nginx 实际读取的前端构建文件
+├─ ragAgent/                              FastAPI、LangChain Agent 与 RAG
+│  ├─ README.md                           Agent 独立说明
+│  ├─ requirements.txt                    Agent 核心依赖
+│  ├─ requirements-fastapi.txt            FastAPI 服务依赖
+│  ├─ start.ps1、start.bat                 本地启动脚本
+│  ├─ backend/main.py                     聊天、健康检查与知识上传 API
+│  ├─ agent/
+│  │  ├─ react_agent.py                   Agent 编排入口
+│  │  └─ tools/
+│  │     ├─ ShortMemory.py                短期记忆
+│  │     ├─ concert_tools.py              演唱会相关工具
+│  │     ├─ agent_tools.py                Agent 工具
+│  │     └─ middleware.py                 Agent 中间件
+│  ├─ rag/
+│  │  ├─ rag_service.py                   RAG 检索服务
+│  │  └─ vector_store.py                  向量库访问
+│  ├─ model/factory.py                    模型工厂
+│  ├─ config/
+│  │  └─ agent.yml、rag.yml、chroma.yml、prompts.yml
+│  ├─ prompts/                            提示词资源
+│  ├─ utils/                              配置、文件、日志与提示词加载工具
+│  ├─ data/                               原始知识文件
+│  ├─ database/                           SQLite 会话与 checkpoint，运行时创建
+│  └─ chroma_db/                          Chroma 向量数据，运行时创建
+└─ db/
+   └─ 生成.sql                            当前 MySQL 业务空库建表脚本
 ```
+
+上表展开主要业务文件，`…` 表示省略的同类文件；运行时目录不一定存在于全新克隆中。
 
 `mall/` 是独立学习项目，不属于此系统，也不纳入本仓库。
 
