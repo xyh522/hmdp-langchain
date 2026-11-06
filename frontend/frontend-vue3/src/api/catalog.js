@@ -9,3 +9,5 @@ export const buyOrdinaryVoucher = id => http.post(`/voucher-order/ordinary/${id}
 export const buyVoucher = id => http.post(`/voucher-order/seckill/${id}`)
 export const listOrders = (current = 1) => http.get('/voucher-order/list', { params: { current } })
 export const getOrder = id => http.get(`/voucher-order/${id}`)
+export const payOrder = id => http.post(`/voucher-order/${id}/pay`)
+export const cancelOrder = id => http.post(`/voucher-order/${id}/cancel`)

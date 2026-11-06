@@ -34,6 +34,16 @@ public class VoucherOrderController {
     @Resource
     private VoucherOrderMapper voucherOrderMapper;
 
+    @PostMapping("/{id}/pay")
+    public Result payOrder(@PathVariable("id") Long id) {
+        return voucherOrderService.payOrder(id);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public Result cancelOrder(@PathVariable("id") Long id) {
+        return voucherOrderService.cancelOrder(id);
+    }
+
     @GetMapping("/list")
     public Result listMyOrders(@RequestParam(defaultValue = "1") long current) {
         if (current < 1) return Result.fail("页码无效");

@@ -19,4 +19,10 @@ public interface IVoucherOrderService extends IService<VoucherOrder> {
     void createVoucherOrder(VoucherOrder voucherOrder);
 
     Result buyOrdinaryVoucher(Long voucherId);
+
+    Result payOrder(Long orderId);
+
+    Result cancelOrder(Long orderId);
+
+    void closeUnpaidOrder(Long orderId);
 }

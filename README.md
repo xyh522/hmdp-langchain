@@ -1,6 +1,6 @@
 **黑马点评与 RAG Agent 项目**
 
-这是一个供学习和本地运行的店铺点评与优惠券系统。浏览器页面由 Vue 3 构建、Nginx 提供；Java 服务处理用户、店铺、优惠券和订单；Python Agent 提供演唱会购票知识问答。三个应用分别运行，通过 HTTP 接口连接。当前前端有普通用户和管理员入口，客服聊天经 Java 转发给 Agent。秒杀券订单只展示抢购记录，没有接入支付。
+这是一个供学习和本地运行的店铺点评与优惠券系统。浏览器页面由 Vue 3 构建、Nginx 提供；Java 服务处理用户、店铺、优惠券和订单；Python Agent 提供演唱会购票知识问答。三个应用分别运行，通过 HTTP 接口连接。当前前端有普通用户和管理员入口，客服聊天经 Java 转发给 Agent。普通券和秒杀券订单支持模拟支付、主动取消、一分钟未支付自动取消和前端倒计时；模拟支付会更新订单状态及秒杀券数据库库存，不涉及真实扣款。
 
 **项目结构**
 
@@ -16,14 +16,14 @@
 │     │  │  ├─ cache/
 │     │  │  │  └─ SeckillVoucherListLocalCache.java  列表本地缓存、失效和广播发送方法
 │     │  │  ├─ config/
-│     │  │  │  ├─ RabbitMQConfig.java      订单、死信与缓存广播的交换机和队列
+│     │  │  │  ├─ RabbitMQConfig.java      下单、超时等待、死信与缓存广播配置
 │     │  │  │  ├─ RedissonConfig.java      Redis 分布式锁客户端
 │     │  │  │  ├─ MvcConfig.java           登录与管理权限拦截器配置
 │     │  │  │  ├─ MybatisConfig.java       MyBatis-Plus 配置
 │     │  │  │  └─ WebExceptionAdvice.java  接口异常处理
 │     │  │  ├─ controller/
 │     │  │  │  ├─ VoucherController.java       普通券、秒杀券列表与新增入口
-│     │  │  │  ├─ VoucherOrderController.java  购买、抢购及订单查询
+│     │  │  │  ├─ VoucherOrderController.java  下单、模拟支付、取消及订单查询
 │     │  │  │  ├─ AdminController.java         管理端接口
 │     │  │  │  ├─ CustomerController.java      客服聊天与 Agent 转发入口
 │     │  │  │  ├─ UserController.java          用户与登录接口
@@ -41,7 +41,7 @@
 │     │  │  │  ├─ VoucherOrder.java        优惠券订单
 │     │  │  │  └─ …                       用户、店铺、博客及客服实体
 │     │  │  ├─ listener/
-│     │  │  │  ├─ SeckillOrderListener.java         订单消费、确认与死信处理
+│     │  │  │  ├─ SeckillOrderListener.java         下单消费、超时关闭与死信处理
 │     │  │  │  └─ SeckillVoucherCacheListener.java  接收跨 JVM 缓存失效通知
 │     │  │  ├─ mapper/
 │     │  │  │  ├─ VoucherMapper.java       普通券、秒杀券及管理列表查询
@@ -54,7 +54,7 @@
 │     │  │  │  └─ impl/
 │     │  │  │     ├─ SeckillVoucherServiceImpl.java  三级缓存查询与回填
 │     │  │  │     ├─ VoucherServiceImpl.java         券查询、新增及提交后失效调用
-│     │  │  │     ├─ VoucherOrderServiceImpl.java    Lua 抢购、普通券购买与订单落库
+│     │  │  │     ├─ VoucherOrderServiceImpl.java    抢购、订单落库、支付扣库存与取消释放预占
 │     │  │  │     ├─ MessageProducerServiceImpl.java RabbitMQ 订单消息生产者
 │     │  │  │     ├─ AdminManagementService.java     管理端店铺与优惠券业务
 │     │  │  │     └─ …                              用户、店铺、博客及客服业务
@@ -94,7 +94,7 @@
 │  │  │  │  ├─ SiteLayout.vue              页面公共布局
 │  │  │  │  └─ pages/
 │  │  │  │     ├─ ShopDetailPage.vue       店铺详情、普通券和秒杀券独立列表
-│  │  │  │     ├─ OrdersPage.vue           优惠券订单列表
+│  │  │  │     ├─ OrdersPage.vue           订单列表、一分钟倒计时、模拟支付与取消
 │  │  │  │     ├─ AdminPage.vue            管理端页面
 │  │  │  │     ├─ HomePage.vue、ShopsPage.vue、SearchPage.vue
 │  │  │  │     └─ …                       登录、个人中心及博客详情页面
@@ -143,7 +143,7 @@
 | --- | --- | --- |
 | 浏览器端 | Vue 3、Vue Router、Axios、Vite | 店铺浏览与搜索、博客、登录、客服、秒杀券订单、管理员店铺及优惠券页面 |
 | 静态服务与代理 | Nginx for Windows | 提供 Vue 构建文件，将 `/api/` 转发至 Java；客服 SSE 关闭代理缓冲 |
-| Java 后端 | Spring Boot 2.3.12、MyBatis-Plus、MySQL、Redis/Redisson、Caffeine 2.9.3、RabbitMQ | 业务接口、用户会话与角色检查、店铺及优惠券管理、秒杀资格判断和异步订单入库 |
+| Java 后端 | Spring Boot 2.3.12、MyBatis-Plus、MySQL、Redis/Redisson、Caffeine 2.9.3、RabbitMQ | 业务接口、用户会话与角色检查、店铺及优惠券管理、秒杀资格判断、异步订单入库、支付与超时取消 |
 | Agent 服务 | Python 3.12、FastAPI、LangChain/LangGraph、DashScope、Chroma、SQLite | 演唱会知识检索、模型调用、按 thread_id 隔离的对话记忆、SSE 回复 |
 
 后端 `pom.xml` 的 `java.version` 为 **1.8**，这是源码/目标级别；实际运行 JDK 还需与项目依赖兼容。Agent 在 `config/rag.yml` 中使用 `qwen-max` 聊天模型和 `text-embedding-v4` 向量模型，调用模型需要有效的 DashScope 密钥。
@@ -155,20 +155,20 @@
   └─ Nginx /api → Spring Boot :8081
        ├─ MySQL hmdp：店铺、用户、优惠券、订单、客服会话与消息
        ├─ Redis：登录状态、缓存、秒杀资格与库存等
-       ├─ RabbitMQ：秒杀订单异步写入
+       ├─ RabbitMQ：秒杀订单异步写入、一分钟未支付订单的超时检查
        └─ /api/chat → FastAPI :8000 → Agent → DashScope / Chroma
                                   └─ SSE 分片返回 Java，再返回浏览器
 ```
 
 浏览器不直接传入可决定订单归属的用户 ID；Java 根据当前登录用户读取其订单。客服由 Java 传 `message`、`user_id`、`thread_id` 给 Agent；Agent 的短期记忆按 `thread_id` 隔离。秒杀请求先完成 Redis 资格判断，再经 RabbitMQ 异步写入 MySQL，因此接口返回与订单可查询之间可能有短暂延迟。
 
-**本次更新：秒杀券列表三级缓存（Caffeine）**
+**秒杀券列表与三级缓存**
 
 秒杀券展示与抢购流程分离：店铺页面分别请求普通券列表和秒杀券列表；Caffeine 只缓存店铺下的完整秒杀券信息列表，不缓存实时库存，不参与库存扣减和订单创建。
 
 | 接口（Java 路径） | 用途 |
 | --- | --- |
-| `GET /voucher/list/{shopId}` | 普通券列表，查询上架的普通券，不经过本次新增的 Caffeine |
+| `GET /voucher/list/{shopId}` | 普通券列表，查询上架的普通券，不经过 Caffeine |
 | `GET /voucher/seckill/list/{shopId}` | 秒杀券列表，按 Caffeine → Redis → MySQL 加载 |
 | `POST /voucher-order/ordinary/{id}` | 普通券购买入口 |
 | `POST /voucher-order/seckill/{id}` | 现有秒杀抢购入口，Redis Lua 资格校验与扣库存、RabbitMQ 异步落库 |
@@ -190,9 +190,9 @@
 | Redis：`seckill:voucher:list:{shopId}` | JSON 券 ID 数组，例如 `[19,20]` | 到列表中最晚一张券的结束时间；空数组 `[]` 保留 60 秒 |
 | Redis：`seckill:voucher:{voucherId}` | 单张券完整 DTO JSON，包含描述、规则、金额、开始和结束时间等 | 各自到该券的结束时间 |
 | Redisson：`lock:seckill:voucher:list:{shopId}` | 店铺粒度的分布式锁 | 协调列表加载、重建与缓存失效 |
-| Redis：`seckill:stock:{voucherId}` | 抢购使用的实时库存 | 由原抢购流程管理，不属于本次展示缓存清理范围 |
+| Redis：`seckill:stock:{voucherId}` | 抢购使用的实时库存 | 由原抢购流程管理，不属于展示缓存清理范围 |
 
-表中的花括号表示变量占位，实际键如 `seckill:voucher:list:1`、`seckill:voucher:19`，不含花括号。每张券独立设置 TTL，因此不同活动可在不同时间到期。索引缺失、任一详情缺失/过期或格式不符合当前 DTO 时，一次联表查询重建该店铺列表，而不是逐张查数据库。当前不再使用单券本地缓存、独立单券查询接口或 `seckill:voucher:null:` 空值键。
+表中的花括号表示变量占位，实际键如 `seckill:voucher:list:1`、`seckill:voucher:19`，不含花括号。每张券独立设置 TTL，因此不同活动可在不同时间到期。索引缺失、任一详情缺失/过期或格式不符合当前 DTO 时，一次联表查询重建该店铺列表，而不是逐张查数据库。
 
 主要代码位置：
 
@@ -208,11 +208,69 @@
 | `frontend/frontend-vue3/src/components/VoucherCard.vue` | 普通券、秒杀券卡片展示和购买按钮 |
 | `frontend/frontend-vue3/src/components/pages/ShopDetailPage.vue` | 分别加载普通券、秒杀券列表，调用各自购买入口 |
 
-写入端已有的新增、删除秒杀券路径调用 `invalidateAfterCommit(shopId, voucherId)`：数据库提交后删除 Redis 店铺索引、受影响的券详情及当前 JVM 列表；回滚时不执行提交回调。后续修改接口也需要显式调用此入口，直接修改数据库不会自动触发缓存清理。独立的 `SeckillVoucherListCacheInvalidator` 已合并到列表缓存类。
+写入端已有的新增、删除秒杀券路径调用 `invalidateAfterCommit(shopId, voucherId)`：数据库提交后删除 Redis 店铺索引、受影响的券详情及当前 JVM 列表；回滚时不执行提交回调。后续修改接口也需要显式调用此入口，直接修改数据库不会自动触发缓存清理。
 
 **广播当前接入状态：** 已声明 `seckill.cache.invalidation.exchange` Fanout 交换机，并实现每 JVM 独立匿名队列、消费者和 `publishInvalidation()` 发送方法。但当前 `invalidateAfterCommit()` 仍直接调用 `invalidateNow()`，没有调用发送方法，因此新增/删除尚不会自动广播。跨 JVM 失效链路仍需接通，不能仅凭存在消费者就认定广播已生效。匿名队列使用 `setMasterLocator(null)` 移除旧版 Spring AMQP 默认的弃用参数，以避免 RabbitMQ 拒绝 `x-queue-master-locator` 队列声明。
 
-本次缓存改动不包含库存为零触发广播、售罄自动隐藏、死信回流票、可靠消息补偿或支付流程。展示缓存的清理不能代替库存校验。当前订单消费者仍存在异常被内层捕获、自定义重试计数未递增等问题；死信处理仅记录日志并确认消息，未实现 Redis 库存归还。上述内容是待完善项，不应当作已有一致性保障。
+展示缓存不负责库存校验或售罄自动隐藏。订单及库存处理见下文。
+
+**订单、支付与库存**
+
+普通券直接创建待支付订单。秒杀券先通过 Redis Lua 检查库存和重复购买资格、预扣 Redis 库存，再经 RabbitMQ 异步写入订单，创建订单时不扣 MySQL 库存。订单支付期限为 `create_time + 1 分钟`，秒杀订单的创建时间在消费者落库时设置。
+
+| Java 接口路径 | 用途 |
+| --- | --- |
+| `POST /voucher-order/ordinary/{id}` | 创建普通券待支付订单 |
+| `POST /voucher-order/seckill/{id}` | 提交秒杀下单请求，返回订单 ID，不代表已支付 |
+| `GET /voucher-order/list?current=1` | 查询当前用户订单列表，包含 `status`、`createTime` 等信息 |
+| `GET /voucher-order/{id}` | 查询当前用户的单个订单 |
+| `POST /voucher-order/{id}/pay` | 模拟支付，仅允许本人、待支付且创建未满一分钟的订单 |
+| `POST /voucher-order/{id}/cancel` | 主动取消本人待支付订单 |
+
+通过 Nginx 访问时接口带 `/api` 前缀。支付不涉及真实扣款，也不调用 RabbitMQ。
+
+订单状态使用现有 `status` 字段：`1` 待支付、`2` 已支付、`4` 已取消。主动取消和超时取消共用状态 `4`，页面显示“支付失败（已取消）”。`3` 已核销、`5` 退款中、`6` 已退款为预留状态，尚无对应业务流程。
+
+| 秒杀订单阶段 | MySQL `tb_seckill_voucher.stock` | Redis 库存与资格 |
+| --- | --- | --- |
+| 下单 | 不修改库存，只创建订单 | 库存减一，记录用户购买资格 |
+| 模拟支付成功 | 库存减一，与订单 `1 → 2` 在同一事务提交 | 不重复扣减，保留购买资格 |
+| 主动取消或超时取消 | 不修改库存，订单 `1 → 4` | 库存加一，移除购买资格 |
+| 已支付或已取消订单收到到期消息 | 不修改 | 不修改 |
+
+支付扣库存要求 `stock > 0`；扣减失败会回滚支付状态。取消使用 `WHERE id = ? AND status = 1` 条件更新，只有成功变为已取消才释放 Redis 预占。普通券不涉及秒杀库存。MySQL 库存没有扣除未支付预占，因此不能直接覆盖运行中的 Redis 可售库存。
+
+Redis 中 `seckill:stock:{voucherId}` 为整数 String，保存可售库存；`seckill:order:{voucherId}` 为用户 ID Set，用于重复购买校验。`seckill.lua` 还写入 `stream.orders`，但对应的消费代码已注释，订单实际由 RabbitMQ 处理，该 Stream 不承担故障补偿。
+
+**超时消息与页面倒计时**
+
+订单事务提交后，`sendTimeoutAfterCommit()` 将订单 ID 发送至等待队列。相关队列复用 `seckill.order.exchange` 直连交换机：
+
+| 队列 | 路由键 | 职责 |
+| --- | --- | --- |
+| `seckill.order.queue` | `seckill.order` | 立即消费，创建秒杀订单 |
+| `seckill.order.timeout.wait.1m.queue` | `order.wait.1m` | 无消费者，消息 TTL 为 `60000` 毫秒 |
+| `seckill.order.timeout.queue` | `order.timeout` | 消费到期消息，检查并取消待支付订单 |
+
+```text
+订单事务提交 → 发送 orderId → 等待队列停留一分钟
+  → 过期消息通过死信路由进入超时处理队列
+  → 查询订单：待支付则取消并释放 Redis；其他状态或订单不存在则结束
+  → 方法正常返回，Spring 容器发送 ACK
+```
+
+超时监听器显式配置 `ackMode="AUTO"`，覆盖全局手动确认设置，不需要再手动 ACK。提前支付或主动取消不修改等待中的消息；消息到期后根据数据库最新状态决定是否需要处理。
+
+`OrdersPage.vue` 每秒按 `createTime + 60 * 1000 - Date.now()` 计算剩余时间，刷新页面不重置。支付成功后隐藏倒计时；归零后禁用支付，每三秒读取订单列表，后端仍待支付时显示“正在确认订单状态”，读到已取消才显示支付失败。前端不查询队列剩余 TTL，也不在归零时主动取消订单。浏览器时钟偏差会影响显示，支付资格由后端独立校验。
+
+**实现边界**
+
+- 队列 TTL 从消息入队开始，支付期限从订单创建时间开始，提交、投递和消费延迟可能让实际关闭稍晚。
+- 支付状态与 MySQL 库存扣减在同一事务中；取消时的数据库状态更新和 Redis 释放不属于同一事务，尚无跨系统故障补偿。
+- 超时队列未配置失败死信出口，监听器未启用自动重试，且 `default-requeue-rejected=false`，处理异常不保证重试。事务提交后的超时消息发送也没有补偿扫描。
+- 下单消费者仍有内层捕获异常、自定义重试计数未递增的问题；下单失败死信消费者只记录日志并确认消息，不负责释放预占。
+
+RabbitMQ 参考：[消息 TTL](https://www.rabbitmq.com/docs/ttl)、[队列声明](https://www.rabbitmq.com/docs/queues)、[死信路由](https://www.rabbitmq.com/docs/dlx)。
 
 **本地端口与启动顺序（Windows）**
 
@@ -235,7 +293,7 @@ SOURCE D:/java_heima_learning/hmdp+langchain/db/生成.sql;
 
 `db/生成.sql` 包含当前业务用到的 `tb_*` 和 `cs_*` 共 13 张表，只含结构，不含用户、店铺、订单或聊天数据。它用于**空库初始化**；已有业务表时不要重复执行。空库导入后也不会凭空出现店铺、管理员账号或知识内容，需要另行录入。`backend/src/main/resources/db/hmdp.sql` 是旧版样例脚本，包含 `DROP TABLE`；同目录的 `customer_thread_migration.sql`、`customer_login_session.sql`、`user_role.sql` 用于旧库迁移，全新空库导入 `db/生成.sql` 后不要再执行这些脚本。
 
-MySQL 库和表**不会**由 IDEA、MyBatis 或 Java 服务自动创建。Redis 与 RabbitMQ 服务、RabbitMQ 用户及 virtual-host 也需事先准备；Java 的 `RabbitMQConfig` 会声明秒杀订单、死信交换机与队列，以及缓存失效广播交换机和每实例独立的临时队列。连接地址在 `backend/src/main/resources/application.yaml`，换机器后应按实际环境修改。
+MySQL 库和表**不会**由 IDEA、MyBatis 或 Java 服务自动创建。Redis 与 RabbitMQ 服务、RabbitMQ 用户及 virtual-host 也需事先准备；Java 的 `RabbitMQConfig` 会声明秒杀订单、失败死信、一分钟超时等待与处理队列，以及缓存失效广播交换机和每实例独立的临时队列。连接地址在 `backend/src/main/resources/application.yaml`，换机器后应按实际环境修改。
 
 **2. 创建 Agent 虚拟环境并启动**
 
@@ -271,6 +329,10 @@ Agent 的本地数据创建方式：
 
 确认 `agent.base-url` 指向正在运行的 Agent，默认是 `http://127.0.0.1:8000`。Java 默认监听 8081；若端口占用，停止旧进程或修改 `server.port`。需要 JAR 时，在 `backend/` 执行 `mvn -DskipTests package`，构建结果为 `target/hm-dianping-0.0.1-SNAPSHOT.jar`；部署只需可执行 JAR 和外部服务配置，`target/` 其他中间文件可重新生成。
 
+订单有效期需要同时配置三处：`RabbitMQConfig.java` 的 `x-message-ttl=60000`（毫秒）、`VoucherOrderServiceImpl.payOrder()` 的 `minusMinutes(1)`、`OrdersPage.vue` 的 `paymentWindow=60 * 1000`。后端修改后重启服务，前端修改后重新构建并部署静态文件。
+
+变更库存扣减策略前，应先暂停新下单并处理完已有待支付订单，避免将不同扣减策略混用于同一批订单。
+
 **4. 构建 Vue 页面并启动 Nginx**
 
 Vue 源码在 `frontend/frontend-vue3/`，Nginx 读取 `frontend/html/hmdp/`。初次部署或修改页面后：
@@ -297,3 +359,7 @@ cd ..
 - `8081` 启动失败：检查端口占用，以及 MySQL、Redis、RabbitMQ 的地址和凭据。
 - 页面接口 `404`：检查 Nginx `/api/` 代理、Java 是否已重启加载新代码，以及浏览器是否仍在用旧构建文件。
 - 数据为空：确认导入的是目标 MySQL 的 `hmdp` 库；空库建表脚本不包含业务数据，Chroma 空集合也不包含知识。
+
+- RabbitMQ `406 PRECONDITION_FAILED` 且提示 `x-message-ttl` 不一致：同名队列的声明参数必须一致，重启不会覆盖已有 TTL。核对队列名称、路由和配置；当前等待队列为 `seckill.order.timeout.wait.1m.queue`，TTL 为 `60000` 毫秒。调整参数时可使用不同队列名和匹配路由；已有队列需先处理完消息再清理。
+- `SerializedLambdaMeta` / `InaccessibleObjectException`：检查旧版 MyBatis-Plus 与运行 JDK 的反射兼容性。支付、取消接口使用固定列名的普通 `UpdateWrapper`；确认构建结果与运行代码一致。
+- 页面倒计时或状态未更新：确认前端产物已复制到 `frontend/html/hmdp`，强制刷新浏览器；倒计时按订单原创建时间计算，可新建订单检查完整一分钟流程。

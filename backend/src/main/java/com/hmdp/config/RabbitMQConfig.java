@@ -11,6 +11,33 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 @Configuration
 public class RabbitMQConfig {
+    public static final String ORDER_WAIT_QUEUE = "seckill.order.timeout.wait.1m.queue";
+    public static final String ORDER_TIMEOUT_QUEUE = "seckill.order.timeout.queue";
+
+    // 等待队列不设置消费者，一分钟后通过死信路由进入超时处理队列。
+    @Bean
+    public Queue orderWaitQueue() {
+        return QueueBuilder.durable(ORDER_WAIT_QUEUE)
+                .withArgument("x-message-ttl", 60000)
+                .withArgument("x-dead-letter-exchange", SECKILL_ORDER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", "order.timeout").build();
+    }
+
+    @Bean
+    public Queue orderTimeoutQueue() {
+        return QueueBuilder.durable(ORDER_TIMEOUT_QUEUE).build();
+    }
+
+    @Bean
+    public Binding orderWaitBinding() {
+        return BindingBuilder.bind(orderWaitQueue()).to(seckillOrderExchange()).with("order.wait.1m");
+    }
+
+    @Bean
+    public Binding orderTimeoutBinding() {
+        return BindingBuilder.bind(orderTimeoutQueue()).to(seckillOrderExchange()).with("order.timeout");
+    }
+
     // 秒杀订单相关常量
     public static final String SECKILL_ORDER_EXCHANGE = "seckill.order.exchange";
     public static final String SECKILL_ORDER_QUEUE = "seckill.order.queue";

@@ -141,6 +141,11 @@ public class SeckillOrderListener {
         }
     }
 
+    @RabbitListener(queues = RabbitMQConfig.ORDER_TIMEOUT_QUEUE, ackMode = "AUTO")
+    public void handleOrderTimeout(Long orderId) {
+        voucherOrderService.closeUnpaidOrder(orderId);
+    }
+
     /**
      * 检查消息是否已被处理
      */
